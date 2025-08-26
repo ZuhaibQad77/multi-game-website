@@ -8,7 +8,6 @@
     body {
       font-family: Arial, sans-serif;
       margin: 0;
-      padding: 0;
       background: #f4f4f4;
       color: #222;
       transition: background 0.3s, color 0.3s;
@@ -22,6 +21,7 @@
       text-align: center;
       background: #007bff;
       color: white;
+      position: relative;
     }
     #darkModeToggle {
       position: absolute;
@@ -54,24 +54,42 @@
     .hidden {
       display: none;
     }
-    .scoreboard {
-      margin-top: 30px;
+    .game-section h2 {
+      margin-top: 0;
     }
-    .scoreboard h3 {
+    .puzzle-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 5px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .tile {
+      width: 100px;
+      height: 100px;
+      font-size: 2em;
       text-align: center;
-    }
-    .scoreboard ul {
-      list-style: none;
-      padding: 0;
-    }
-    .scoreboard li {
-      padding: 8px;
-      background: #eee;
-      margin: 5px 0;
+      line-height: 100px;
+      background: #ddd;
       border-radius: 4px;
+      cursor: pointer;
     }
-    body.dark .scoreboard li {
-      background: #333;
+    .tile.empty {
+      background: transparent;
+      cursor: default;
+    }
+    #quizOptions button {
+      display: block;
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 1em;
+      border: 1px solid #007bff;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #quizOptions button:hover {
+      background-color: #e6f0ff;
     }
   </style>
 </head>
@@ -90,45 +108,57 @@
       </div>
     </section>
 
-    <section id="quiz" class="hidden">
+    <!-- Quiz Game -->
+    <section id="quiz" class="hidden game-section">
       <h2>AI Quiz Game</h2>
       <p id="quizQuestion">Loading...</p>
       <div id="quizOptions"></div>
       <button onclick="nextQuestion()">Next</button>
       <p id="quizScore"></p>
+      <button onclick="goHome()">🔙 Home</button>
     </section>
 
-    <section id="puzzle" class="hidden">
-      <h2>Puzzle Game</h2>
-      <div id="puzzleBoard">
-        <p>Coming soon... (Add JavaScript logic here)</p>
-      </div>
-    </section>
-
-    <section class="scoreboard">
-      <h3>🏆 High Scores</h3>
-      <ul id="scoreList">
-        <li>Quiz: 4/5</li>
-        <li>Puzzle: 120 seconds</li>
-      </ul>
+    <!-- Puzzle Game -->
+    <section id="puzzle" class="hidden game-section">
+      <h2>Sliding Puzzle Game</h2>
+      <div class="puzzle-grid" id="puzzleGrid"></div>
+      <p id="puzzleStatus"></p>
+      <button onclick="shufflePuzzle()">🔄 Shuffle</button>
+      <button onclick="goHome()">🔙 Home</button>
     </section>
   </main>
 
   <script>
+    // ========== DARK MODE ==========
+    const toggle = document.getElementById("darkModeToggle");
+    toggle.onclick = () => {
+      document.body.classList.toggle("dark");
+    };
+
+    // ========== NAVIGATION ==========
+    function showGame(game) {
+      document.getElementById('home').classList.add('hidden');
+      document.getElementById('quiz').classList.add('hidden');
+      document.getElementById('puzzle').classList.add('hidden');
+      document.getElementById(game).classList.remove('hidden');
+      if (game === 'quiz') loadQuestion();
+      if (game === 'puzzle') setupPuzzle();
+    }
+
+    function goHome() {
+      document.getElementById('quiz').classList.add('hidden');
+      document.getElementById('puzzle').classList.add('hidden');
+      document.getElementById('home').classList.remove('hidden');
+    }
+
+    // ========== QUIZ GAME ==========
     const questions = [
       { q: "What does AI stand for?", options: ["Artificial Intelligence", "Analog Input", "Advanced Interface", "Auto Information"], a: 0 },
       { q: "Which language is most used in AI?", options: ["Python", "JavaScript", "Ruby", "C++"], a: 0 },
       { q: "What is ML?", options: ["Machine Learning", "Maximum Logic", "Manual Looping", "Massive Listing"], a: 0 },
     ];
-
     let current = 0;
     let score = 0;
-
-    function showGame(game) {
-      document.getElementById('home').classList.add('hidden');
-      document.getElementById(game).classList.remove('hidden');
-      if (game === 'quiz') loadQuestion();
-    }
 
     function loadQuestion() {
       const q = questions[current];
@@ -137,16 +167,18 @@
         return `<button onclick="checkAnswer(${i})">${opt}</button>`;
       }).join("");
       document.getElementById("quizOptions").innerHTML = options;
+      document.getElementById("quizScore").textContent = `Score: ${score}/${questions.length}`;
     }
 
     function checkAnswer(selected) {
       const q = questions[current];
       if (selected === q.a) {
-        alert("Correct!");
+        alert("✅ Correct!");
         score++;
       } else {
-        alert("Wrong!");
+        alert("❌ Wrong!");
       }
+      document.querySelectorAll("#quizOptions button").forEach(btn => btn.disabled = true);
     }
 
     function nextQuestion() {
@@ -154,15 +186,78 @@
       if (current < questions.length) {
         loadQuestion();
       } else {
+        document.getElementById("quizQuestion").textContent = "Quiz Finished!";
+        document.getElementById("quizOptions").innerHTML = "";
         document.getElementById("quizScore").textContent = `Final Score: ${score}/${questions.length}`;
       }
     }
 
-    // Dark mode toggle
-    const toggle = document.getElementById("darkModeToggle");
-    toggle.onclick = () => {
-      document.body.classList.toggle("dark");
-    };
+    // ========== PUZZLE GAME ==========
+    let tiles = [];
+    const puzzleSize = 3;
+
+    function setupPuzzle() {
+      const grid = document.getElementById("puzzleGrid");
+      grid.innerHTML = '';
+      tiles = Array.from({length: 8}, (_, i) => i + 1);
+      tiles.push(null); // empty space
+      shuffleArray(tiles);
+      renderPuzzle();
+    }
+
+    function renderPuzzle() {
+      const grid = document.getElementById("puzzleGrid");
+      grid.innerHTML = '';
+      tiles.forEach((val, idx) => {
+        const tile = document.createElement("div");
+        tile.className = 'tile';
+        if (val === null) {
+          tile.classList.add('empty');
+        } else {
+          tile.textContent = val;
+          tile.onclick = () => moveTile(idx);
+        }
+        grid.appendChild(tile);
+      });
+    }
+
+    function moveTile(index) {
+      const empty = tiles.indexOf(null);
+      const validMoves = [index - 1, index + 1, index - puzzleSize, index + puzzleSize];
+      if (validMoves.includes(empty) && isAdjacent(index, empty)) {
+        [tiles[empty], tiles[index]] = [tiles[index], tiles[empty]];
+        renderPuzzle();
+        checkWin();
+      }
+    }
+
+    function isAdjacent(i1, i2) {
+      const x1 = i1 % puzzleSize, y1 = Math.floor(i1 / puzzleSize);
+      const x2 = i2 % puzzleSize, y2 = Math.floor(i2 / puzzleSize);
+      return Math.abs(x1 - x2) + Math.abs(y1 - y2) === 1;
+    }
+
+    function checkWin() {
+      const solved = [...tiles.slice(0, 8)].every((val, idx) => val === idx + 1);
+      if (solved && tiles[8] === null) {
+        document.getElementById("puzzleStatus").textContent = "🎉 Puzzle Solved!";
+      } else {
+        document.getElementById("puzzleStatus").textContent = "";
+      }
+    }
+
+    function shufflePuzzle() {
+      shuffleArray(tiles);
+      renderPuzzle();
+      document.getElementById("puzzleStatus").textContent = "";
+    }
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
   </script>
 </body>
 </html>
