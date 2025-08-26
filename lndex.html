@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-Game Site with Timer, Scores & Music</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1, h2 {
+      text-align: center;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+    button, input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 1em;
+      border-radius: 5px;
+      border: none;
+      outline: none;
+    }
+    button {
+      background-color: #ff6f61;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 4px 8px rgba(255,111,97,0.6);
+    }
+    button:hover {
+      background-color: #ff3b2f;
+    }
+    pre {
+      background: rgba(255,255,255,0.15);
+      padding: 15px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      min-height: 60px;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+    }
+    .section {
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 10px;
+      width: 100%;
+      margin-bottom: 30px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      animation: fadeIn 1s ease;
+    }
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(20px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+    #timer {
+      font-weight: bold;
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      color: #ffd700;
+      text-align: center;
+    }
+    #musicToggle {
+      margin-bottom: 20px;
+      background-color: #4caf50;
+      box-shadow: 0 4px 8px rgba(76,175,80,0.6);
+    }
+    #musicToggle.active {
+      background-color: #d32f2f;
+      box-shadow: 0 4px 8px rgba(211,47,47,0.6);
+    }
+    #scoreboard {
+      background: rgba(255,255,255,0.2);
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Multi-Game Site</h1>
+
+  <!-- Music Toggle -->
+  <button id="musicToggle">🎵 Play Music</button>
+  <audio id="bgMusic" loop>
+    <source src="https://cdn.pixabay.com/download/audio/2021/09/29/audio_7b4357a4ae.mp3?filename=happy-ukulele-12586.mp3" type="audio/mpeg" />
+    Your browser does not support the audio element.
+  </audio>
+
+  <!-- QUIZ GAME SECTION -->
+  <section class="section" id="quizSection">
+    <h2>AI Quiz Game</h2>
+    <div id="timer">Time Left: 30s</div>
+    <div id="questionContainer"></div>
+    <div id="answersContainer"></div>
+    <button id="nextBtn" style="display:none;">Next Question</button>
+    <div id="quizResult"></div>
+    <div id="scoreboard"></div>
+  </section>
+
+  <!-- PUZZLE GAME SECTION -->
+  <section class="section" id="puzzleSection">
+    <h2>Sliding Puzzle Game (3x3)</h2>
+    <div id="puzzleContainer"></div>
+    <button id="puzzleResetBtn">Reset Puzzle</button>
+    <div id="puzzleStatus" style="margin-top:10px;"></div>
+  </section>
+
+  <script>
+    // ======= MUSIC TOGGLE =======
+    const musicToggle = document.getElementById('musicToggle');
+    const bgMusic = document.getElementById('bgMusic');
+
+    musicToggle.addEventListener('click', () => {
+      if (bgMusic.paused) {
+        bgMusic.play();
+        musicToggle.textContent = "🔇 Pause Music";
+        musicToggle.classList.add('active');
+      } else {
+        bgMusic.pause();
+        musicToggle.textContent = "🎵 Play Music";
+        musicToggle.classList.remove('active');
+      }
+    });
+
+    // ======= QUIZ GAME =======
+    const quizQuestions = [
+      { q: "What does AI stand for?", options: ["Artificial Intelligence", "Automatic Input", "Advanced Internet", "Applied Innovation"], answer: 0 },
+      { q: "Which language is primarily used for AI programming?", options: ["Python", "HTML", "CSS", "PHP"], answer: 0 },
+      { q: "What is a neural network?", options: ["A social network", "A brain-inspired computing system", "A type of hardware", "A programming language"], answer: 1 },
+      { q: "Which company developed the GPT models?", options: ["Google", "Microsoft", "OpenAI", "IBM"], answer: 2 },
+      { q: "What is machine learning?", options: ["Cooking recipes", "Teaching computers to learn from data", "Reading books", "Playing games"], answer: 1 },
+      // ... Add 45 more questions or repeat these for demo
+    ];
+
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let timeLeft = 30;
+    let timerId;
+
+    const questionContainer = document.getElementById('questionContainer');
+    const answersContainer = document.getElementById('answersContainer');
+    const nextBtn = document.getElementById('nextBtn');
+    const quizResult = document.getElementById('quizResult');
+    const timerDisplay = document.getElementById('timer');
+    const scoreboard = document.getElementById('scoreboard');
+
+    function startTimer() {
+      timeLeft = 30;
+      timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+      timerId = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          showCorrectAnswer();
+          disableAnswers();
+          nextBtn.style.display = 'block';
+        }
+      }, 1000);
+    }
+
+    function loadQuestion() {
+      clearInterval(timerId);
+      startTimer();
+      nextBtn.style.display = 'none';
+      quizResult.textContent = '';
+      const q = quizQuestions[currentQuestionIndex];
+      questionContainer.textContent = q.q;
+      answersContainer.innerHTML = '';
+      q.options.forEach((option, index) => {
+        const btn = document.createElement('button');
+        btn.textContent = option;
+        btn.onclick = () => selectAnswer(index);
+        answersContainer.appendChild(btn);
+      });
+      enableAnswers();
+    }
+
+    function selectAnswer(index) {
+      clearInterval(timerId);
+      disableAnswers();
+      const correct = quizQuestions[currentQuestionIndex].answer;
+      if (index === correct) {
+        score++;
+        quizResult.textContent = 'Correct!';
+        quizResult.style.color = 'lightgreen';
+      } else {
+        quizResult.textContent = `Wrong! Correct answer: ${quizQuestions[currentQuestionIndex].options[correct]}`;
+        quizResult.style.color = 'salmon';
+      }
+      saveScore();
+      nextBtn.style.display = 'block';
+      updateScoreboard();
+    }
+
+    function showCorrectAnswer() {
+      const correct = quizQuestions[currentQuestionIndex].answer;
+      quizResult.textContent = `Time's up! Correct answer: ${quizQuestions[currentQuestionIndex].options[correct]}`;
+      quizResult.style.color = 'orange';
+      saveScore();
+      updateScoreboard();
+    }
+
+    function disableAnswers() {
+      [...answersContainer.children].forEach(btn => btn.disabled = true);
+    }
+    function enableAnswers() {
+      [...answersContainer.children].forEach(btn => btn.disabled = false);
+    }
+
+    nextBtn.addEventListener('click', () => {
+      currentQuestionIndex++;
+      if (currentQuestionIndex >= quizQuestions.length) {
+        quizResult.textContent = `Quiz complete! Your final score is ${score} out of ${quizQuestions.length}.`;
+        questionContainer.textContent = '';
+        answersContainer.innerHTML = '';
+        nextBtn.style.display = 'none';
+        timerDisplay.textContent = '';
+      } else {
+        loadQuestion();
+      }
+    });
+
+    function saveScore() {
+      localStorage.setItem('quizScore', score);
+      localStorage.setItem('quizQuestionIndex', currentQuestionIndex);
+    }
+
+    function loadScore() {
+      const savedScore = localStorage.getItem('quizScore');
+      const savedIndex = localStorage.getItem('quizQuestionIndex');
+      if (savedScore !== null && savedIndex !== null) {
+        score = parseInt(savedScore);
+        currentQuestionIndex = parseInt(savedIndex);
+      }
+    }
+
+    function updateScoreboard() {
+      scoreboard.textContent = `Score: ${score} / ${quizQuestions.length}`;
+    }
+
+    // On page load, resume quiz from localStorage if possible
+    loadScore();
+    updateScoreboard();
+    loadQuestion();
+
+    // ======= PUZZLE GAME =======
+    const puzzleContainer = document.getElementById('puzzleContainer');
+    const puzzleResetBtn = document.getElementById('puzzleResetBtn');
+    const puzzleStatus = document.getElementById('puzzleStatus');
+
+    const size = 3; // 3x3 puzzle
+    let puzzle = [];
+    let emptyIndex;
+
+    function initPuzzle() {
+      puzzleContainer.innerHTML = '';
+      puzzle = [];
+      for (let i = 1; i < size * size; i++) {
+        puzzle.push(i);
+      }
+      puzzle.push(null); // empty slot
+      shufflePuzzle();
+      renderPuzzle();
+      puzzleStatus.textContent = "";
+    }
+
+    function shufflePuzzle() {
+      do {
+        for (let i = puzzle.length -1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i +1));
+          [puzzle[i], puzzle[j]] = [puzzle[j], puzzle[i]];
+        }
+      } while (!isSolvable() || isSolved()); // make sure puzzle is solvable and not already solved
+      emptyIndex = puzzle.indexOf(null);
+    }
+
+    function renderPuzzle() {
+      puzzleContainer.style.display = 'grid';
+      puzzleContainer.style.gridTemplateColumns = `repeat(${size}, 80px)`;
+      puzzleContainer.style.gridGap = '5px';
+      puzzleContainer.innerHTML = '';
+      puzzle.forEach((num, index) => {
+        const tile = document.createElement('button');
+        tile.style.height = '80px';
+        tile.style.fontSize = '1.5em';
+        tile.style.borderRadius = '8px';
+        tile.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+        if (num === null) {
+          tile.style.background = 'rgba(255,255,255,0.3)';
+          tile.disabled = true;
+          tile.textContent = '';
+        } else {
+          tile.textContent = num;
+          tile.style.background = '#ff6f61';
+          tile.style.color = 'white';
+          tile.addEventListener('click', () => moveTile(index));
+        }
+        puzzleContainer.appendChild(tile);
+      });
+    }
+
+    function moveTile(index) {
+      const canMove = [index - 1, index + 1, index - size, index + size].includes(emptyIndex);
+      // Check not moving across rows for left/right
+      if (canMove) {
+        if ((index === emptyIndex - 1 && emptyIndex % size === 0) ||
+            (index === emptyIndex + 1 && index % size === 0)) {
+          return;
+        }
+        puzzle[emptyIndex] = puzzle[index];
+        puzzle[index] = null;
+        emptyIndex = index;
+        renderPuzzle();
+        if (isSolved()) {
+          puzzleStatus.textContent = "🎉 Congratulations! Puzzle solved!";
+        }
+      }
+    }
+
+    function isSolved() {
+      for (let i = 0; i < puzzle.length - 1; i++) {
+        if (puzzle[i] !== i + 1) return false;
+      }
+      return true;
+    }
+
+    // Check solvability of puzzle (for 3x3 only)
+    function isSolvable() {
+      const arr = puzzle.filter(n => n !== null);
+      let inversions = 0;
+      for (let i = 0; i < arr.length - 1; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          if (arr[i] > arr[j]) inversions++;
+        }
+      }
+      return inversions % 2 === 0;
+    }
+
+    puzzleResetBtn.addEventListener('click', () => {
+      initPuzzle();
+    });
+
+    initPuzzle();
+  </script>
+</body>
+</html>
